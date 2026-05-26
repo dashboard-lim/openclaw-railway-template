@@ -25,6 +25,7 @@ COPY package.json pnpm-lock.yaml ./
 RUN npm install -g pnpm@10 && pnpm install --prod
 
 COPY src ./src
+COPY --chmod=755 infra/ ./infra/
 COPY --chmod=755 entrypoint.sh ./entrypoint.sh
 
 RUN useradd -m -s /bin/bash openclaw \
