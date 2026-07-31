@@ -547,7 +547,10 @@ function buildOnboardArgs(payload) {
     "quickstart",
   ];
 
-  if (payload.authChoice) {
+  // DeepSeek has no bundled onboarding auth-choice — it is registered as a
+  // custom provider after onboarding (see /setup/api/run), so we skip passing
+  // it to `openclaw onboard` here.
+  if (payload.authChoice && payload.authChoice !== "deepseek-api-key") {
     args.push("--auth-choice", payload.authChoice);
 
     const secret = (payload.authSecret || "").trim();
@@ -615,6 +618,7 @@ const VALID_AUTH_CHOICES = [
   "copilot-proxy",
   "synthetic-api-key",
   "opencode-zen",
+  "deepseek-api-key",
 ];
 
 function validatePayload(payload) {
@@ -662,7 +666,11 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     let extra = "";
     extra += `\n[setup] Onboarding exit=${onboard.code} configured=${isConfigured()}\n`;
 
-    const ok = onboard.code === 0 && isConfigured();
+    // DeepSeek is registered as a custom provider (below), not via onboarding,
+    // so its base onboard run may not select a provider — treat it as OK so the
+    // config-set path runs (the config-set calls create/populate openclaw.json).
+    const isDeepSeek = payload.authChoice === "deepseek-api-key";
+    const ok = (onboard.code === 0 && isConfigured()) || isDeepSeek;
 
     if (ok) {
       extra += "\n[setup] Configuring gateway settings...\n";
@@ -700,6 +708,23 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         ]),
       );
       extra += `[config] gateway.trustedProxies exit=${proxiesResult.code}\n`;
+
+      // Register DeepSeek as a custom OpenAI-compatible provider so
+      // `deepseek/deepseek-chat` resolves (matches the docs' custom-provider path).
+      if (isDeepSeek) {
+        const secret = (payload.authSecret || "").trim();
+        const dsCfg = JSON.stringify({
+          baseUrl: "https://api.deepseek.com",
+          api: "openai-completions",
+          apiKey: secret,
+          models: [{ id: "deepseek-chat", name: "DeepSeek Chat" }],
+        });
+        const dsResult = await runCmd(
+          OPENCLAW_NODE,
+          clawArgs(["config", "set", "--json", "models.providers.deepseek", dsCfg]),
+        );
+        extra += `[config] models.providers.deepseek exit=${dsResult.code}\n`;
+      }
 
       if (payload.model?.trim()) {
         extra += `[setup] Setting model to ${payload.model.trim()}...\n`;
