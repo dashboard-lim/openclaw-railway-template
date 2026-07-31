@@ -743,6 +743,24 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
         extra += `[models set] exit=${modelResult.code}\n${modelResult.output || ""}`;
       }
 
+      // For DeepSeek, onboarding seeds a default `openrouter/auto` alias into
+      // agents.defaults.models. Overwrite the model list so it's DeepSeek-only
+      // (primary is already set above via `models set`).
+      if (isDeepSeek) {
+        const primaryModel = payload.model?.trim() || "deepseek/deepseek-chat";
+        const cleanResult = await runCmd(
+          OPENCLAW_NODE,
+          clawArgs([
+            "config",
+            "set",
+            "--json",
+            "agents.defaults.models",
+            JSON.stringify({ [primaryModel]: {} }),
+          ]),
+        );
+        extra += `[config] agents.defaults.models (DeepSeek-only) exit=${cleanResult.code}\n`;
+      }
+
       async function configureChannel(name, cfgObj) {
         const set = await runCmd(
           OPENCLAW_NODE,
