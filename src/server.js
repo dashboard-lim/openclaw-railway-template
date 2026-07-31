@@ -450,6 +450,14 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
       options: [{ value: "openrouter-api-key", label: "OpenRouter API key" }],
     },
     {
+      // Custom provider: registered against api.deepseek.com after onboarding
+      // (see /setup/api/run). Lets a DeepSeek platform key work directly.
+      value: "deepseek",
+      label: "DeepSeek",
+      hint: "API key",
+      options: [{ value: "deepseek-api-key", label: "DeepSeek API key" }],
+    },
+    {
       value: "ai-gateway",
       label: "Vercel AI Gateway",
       hint: "API key",
